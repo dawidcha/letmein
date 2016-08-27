@@ -12,14 +12,14 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 
 public class JsonSerialization {
-    public class ToLocalDateTime extends JsonDeserializer<LocalDateTime> {
+    public static class ToLocalDateTime extends JsonDeserializer<LocalDateTime> {
         @Override
         public LocalDateTime deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
             return LocalDateTime.parse(jsonParser.getText());
         }
     }
 
-    public class FromLocalDateTime extends JsonSerializer<LocalDateTime> {
+    public static class FromLocalDateTime extends JsonSerializer<LocalDateTime> {
         @Override
         public void serialize(LocalDateTime localDateTime, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
             jsonGenerator.writeString(localDateTime.toString());

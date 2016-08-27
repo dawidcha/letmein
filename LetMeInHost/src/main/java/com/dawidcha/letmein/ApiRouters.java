@@ -4,6 +4,7 @@ import com.dawidcha.letmein.data.BookingInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.Json;
@@ -11,11 +12,12 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 
-import java.io.IOException;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
-import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ApiRouters {
     private static final Logger log = LoggerFactory.getLogger(ApiRouters.class);
@@ -46,13 +48,21 @@ public class ApiRouters {
         return ret;
     }
 
+    private static final Pattern basicAuth = Pattern.compile("^Basic (.+)$");
+    private static final File local = new File("local").isDirectory()? new File("local"): new File("../local");
+
     public static Router loginRouter(Vertx vertx) {
+
         Router ret = Router.router(vertx);
 
         ret.get("/authenticate").handler(rc -> {
             final String name, pwd;
             try {
-                String namePwd = new String(Base64.getDecoder().decode(rc.request().getHeader(HttpHeaders.AUTHORIZATION)), StandardCharsets.UTF_8);
+                Matcher matcher = basicAuth.matcher(rc.request().getHeader(HttpHeaders.AUTHORIZATION));
+                if (!matcher.find()) {
+                    throw new IllegalArgumentException("Use 'Basic' authentication");
+                }
+                String namePwd = new String(Base64.getDecoder().decode(matcher.group(1)), StandardCharsets.UTF_8);
                 int sepIdx = namePwd.indexOf(':');
                 name = namePwd.substring(0, sepIdx);
                 pwd = namePwd.substring(sepIdx + 1);
@@ -63,32 +73,33 @@ public class ApiRouters {
                 return;
             }
 
-            vertx.fileSystem().readFile("../local/bookings.json", result -> {
+            vertx.fileSystem().readFile(local.getAbsolutePath() + "/bookings.json", result -> {
                  if (result.succeeded()) {
-                     final List<BookingInfo> bookings;
                      try {
+                         final List<BookingInfo> bookings;
                          bookings = Json.mapper.readValue(result.result().getBytes(), new TypeReference<List<BookingInfo>>() {});
                          bookings.sort((a,b) -> {
                              return 0;  // TODO figure out booking priority if same email has booked more than once
                          });
+                         for(BookingInfo booking: bookings) {
+
+                             if ((booking.bookingReference.equals(name) || booking.email.equals(name)) &&
+                                    booking.password.equals(pwd)) {
+
+                                 java.util.UUID sessionId = Registry.createSession(booking);
+                                 byte[] response = Json.mapper.writeValueAsBytes(sessionId);
+                                 rc.response().headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(response.length));
+                                 rc.response().write(Buffer.buffer(response));
+                                 closeWithStatus(rc.response(), HttpResponseStatus.OK);
+                                 return;
+                             }
+                         }
+                         closeWithStatus(rc.response(), HttpResponseStatus.FORBIDDEN);
                      }
-                     catch(IOException e) {
+                     catch(Exception e) {
                          log.error("Failed to read booking info", e);
                          closeWithStatus(rc.response(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                         return;
                      }
-                     for(BookingInfo booking: bookings) {
-
-                         if ((booking.bookingReference.equals(name) || booking.email.equals(name)) &&
-                                booking.password.equals(pwd)) {
-
-                             java.util.UUID sessionId = Registry.createSession(booking);
-                             rc.response().write(Json.encode(sessionId));
-                             closeWithStatus(rc.response(), HttpResponseStatus.OK);
-                             return;
-                         }
-                     }
-                     closeWithStatus(rc.response(), HttpResponseStatus.FORBIDDEN);
                  }
                  else {
                      log.warn("Failed to read 'users.txt' file", result.cause());

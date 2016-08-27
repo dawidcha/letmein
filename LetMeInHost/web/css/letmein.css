@@ -5,3 +5,11 @@
 .logo {
     float: left
 }
+
+.inactive-page {
+    display: none
+}
+
+.active-page {
+    display: inherit
+}
