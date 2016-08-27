@@ -10,6 +10,6 @@
     display: none
 }
 
-.active-page {
-    display: inherit
+.hidden-element {
+    display: none
 }

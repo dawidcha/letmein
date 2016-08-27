@@ -14,8 +14,7 @@ import io.vertx.ext.web.Router;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -86,10 +85,13 @@ public class ApiRouters {
                              if ((booking.bookingReference.equals(name) || booking.email.equals(name)) &&
                                     booking.password.equals(pwd)) {
 
-                                 java.util.UUID sessionId = Registry.createSession(booking);
-                                 byte[] response = Json.mapper.writeValueAsBytes(sessionId);
-                                 rc.response().headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(response.length));
-                                 rc.response().write(Buffer.buffer(response));
+                                 UUID sessionId = Registry.createSession(booking);
+                                 Map<String, Object> response = new HashMap<>();
+                                 response.put("SessionId", sessionId.toString());
+                                 response.put("Booking", booking);
+                                 byte[] responseBytes = Json.mapper.writeValueAsBytes(response);
+                                 rc.response().headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(responseBytes.length));
+                                 rc.response().write(Buffer.buffer(responseBytes));
                                  closeWithStatus(rc.response(), HttpResponseStatus.OK);
                                  return;
                              }
