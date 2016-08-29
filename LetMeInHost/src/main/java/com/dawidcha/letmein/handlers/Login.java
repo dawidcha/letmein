@@ -1,12 +1,12 @@
-package com.dawidcha.letmein;
+package com.dawidcha.letmein.handlers;
 
+import com.dawidcha.letmein.Registry;
 import com.dawidcha.letmein.data.BookingInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpHeaders;
-import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -18,39 +18,12 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class ApiRouters {
-    private static final Logger log = LoggerFactory.getLogger(ApiRouters.class);
-
-    private static void closeWithStatus(HttpServerResponse response, HttpResponseStatus status) {
-        response.setStatusCode(status.code());
-        response.setStatusMessage(status.reasonPhrase());
-        response.end();
-    }
-
-    public static Router hubRouter(Vertx vertx) {
-        Router ret = Router.router(vertx);
-
-        ret.put("/:hubId").handler(rc -> {
-
-        });
-
-        return ret;
-    }
-
-    public static Router controlRouter(Vertx vertx) {
-        Router ret = Router.router(vertx);
-
-        ret.put("/").handler(rc -> {
-
-        });
-
-        return ret;
-    }
-
+public class Login {
+    private static final Logger log = LoggerFactory.getLogger(Login.class);
     private static final Pattern basicAuth = Pattern.compile("^Basic (.+)$");
     private static final File local = new File("local").isDirectory()? new File("local"): new File("../local");
 
-    public static Router loginRouter(Vertx vertx) {
+    public static Router makeRouter(Vertx vertx) {
 
         Router ret = Router.router(vertx);
 
@@ -68,7 +41,7 @@ public class ApiRouters {
             }
             catch(Exception e) {
                 log.info("Failed to get user/pwd - " + e.getMessage());
-                closeWithStatus(rc.response(), HttpResponseStatus.BAD_REQUEST);
+                ApiRouters.closeWithStatus(rc.response(), HttpResponseStatus.BAD_REQUEST);
                 return;
             }
 
@@ -92,20 +65,20 @@ public class ApiRouters {
                                  byte[] responseBytes = Json.mapper.writeValueAsBytes(response);
                                  rc.response().headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(responseBytes.length));
                                  rc.response().write(Buffer.buffer(responseBytes));
-                                 closeWithStatus(rc.response(), HttpResponseStatus.OK);
+                                 ApiRouters.closeWithStatus(rc.response(), HttpResponseStatus.OK);
                                  return;
                              }
                          }
-                         closeWithStatus(rc.response(), HttpResponseStatus.FORBIDDEN);
+                         ApiRouters.closeWithStatus(rc.response(), HttpResponseStatus.FORBIDDEN);
                      }
                      catch(Exception e) {
                          log.error("Failed to read booking info", e);
-                         closeWithStatus(rc.response(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                         ApiRouters.closeWithStatus(rc.response(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
                      }
                  }
                  else {
                      log.warn("Failed to read 'users.txt' file", result.cause());
-                     closeWithStatus(rc.response(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                     ApiRouters.closeWithStatus(rc.response(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
                  }
             });
         });
