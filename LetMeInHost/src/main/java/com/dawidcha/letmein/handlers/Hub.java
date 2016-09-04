@@ -63,9 +63,7 @@ public class Hub implements Handler<ServerWebSocket> {
 
         });
 
-        websocket.exceptionHandler(e -> {
-            log.warn("Websocket threw exception", e);
-        });
+        websocket.exceptionHandler(e -> log.warn("Websocket threw exception", e));
     }
 
     @Override
@@ -80,6 +78,7 @@ public class Hub implements Handler<ServerWebSocket> {
             String filePath = local.getAbsolutePath() + "/hubs.json";
             vertx.fileSystem().readFile(filePath, result -> {
                 if (result.succeeded()) {
+                    // Check whether we're good to continue - it's too late to reject the websocket, but we can close it.
                     try {
                         final List<HubInfo> hubs;
                         hubs = Json.mapper.readValue(result.result().getBytes(), new TypeReference<List<HubInfo>>() {});
@@ -90,16 +89,16 @@ public class Hub implements Handler<ServerWebSocket> {
                             }
                         }
                         log.info("No such hub id '" + hubId + "'");
-                        serverWebSocket.reject();
+                        serverWebSocket.close();
                     }
                     catch(Exception e) {
                         log.error("Failed to read booking info", e);
-                        serverWebSocket.reject();
+                        serverWebSocket.close();
                     }
                 }
                 else {
                     log.warn("Failed to read '" + filePath + "'", result.cause());
-                    serverWebSocket.reject();
+                    serverWebSocket.close();
                 }
             });
         }

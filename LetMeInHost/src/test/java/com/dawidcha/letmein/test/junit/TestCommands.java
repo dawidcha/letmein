@@ -1,4 +1,4 @@
-package com.dawidcha.letmein.test.fixtures.junit;
+package com.dawidcha.letmein.test.junit;
 
 import com.dawidcha.letmein.test.fixtures.HttpClient;
 import com.dawidcha.letmein.test.fixtures.MockHostServer;
@@ -7,6 +7,8 @@ import io.vertx.core.http.HttpMethod;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.regex.Pattern;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -24,6 +26,7 @@ public class TestCommands {
 
         client = new HttpClient(showOutput);
         client.setServerPort(hostServer.getServerPort());
+        client.setAccept("application/json");
         client.start();
     }
 
@@ -34,17 +37,25 @@ public class TestCommands {
     }
 
     @Test
-    public void testHubAgentFailConnect() {
-        MockHubAgent hubAgent = new MockHubAgent(showOutput);
-        hubAgent.setServerPort(hostServer.getServerPort());
-        hubAgent.setHubId("no-such-id");
+    public void testHubAgentFailCantConnect () throws Exception {
+        try(MockHubAgent hubAgent = new MockHubAgent(showOutput)
+                .setServerPort(hostServer.getServerPort())
+                .setHubUri("/no-such-uri")
+            ) {
+            hubAgent.start();
 
-        hubAgent.start();
-        try {
-            assertEquals("fail to connect with bad hub id", "asdf", new String(hubAgent.popNextMessage()));
+            hostServer.getProcessDef().waitForMessage(1000, Pattern.compile("Websocket connection to '/no-such-uri' rejected"), false);
+            assertNull("fail to connect with invalid connect uri", hubAgent.popNextMessage());
         }
-        finally {
-            hubAgent.stop();
+
+        try(MockHubAgent hubAgent = new MockHubAgent(showOutput)
+                .setServerPort(hostServer.getServerPort())
+                .setHubId("no-such-id")
+        ) {
+            hubAgent.start();
+
+            hostServer.getProcessDef().waitForMessage(1000, Pattern.compile("No such hub id 'no-such-id'"), false);
+            assertEquals("fail to connect with bad hub id", "Websocket closed by server", new String(hubAgent.popNextMessage()));
         }
     }
 

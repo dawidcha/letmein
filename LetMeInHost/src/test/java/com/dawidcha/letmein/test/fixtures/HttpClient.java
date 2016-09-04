@@ -1,6 +1,7 @@
 package com.dawidcha.letmein.test.fixtures;
 
 import com.dawidcha.letmein.data.controlmessage.BaseMessage;
+import com.dawidcha.letmein.util.Fn;
 import com.dawidcha.letmein.util.Holder;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -74,15 +75,13 @@ public class HttpClient extends Fixture {
         req.headers().add(HttpHeaders.ACCEPT, accept);
 
         final Holder<ReturnData> returnData = new Holder<>();
-        req.handler(response -> {
-            response.bodyHandler(body -> {
-                ReturnData ret = new ReturnData(body.getBytes());
-                synchronized(returnData) {
-                    returnData.value = ret;
-                    returnData.notify();
-                }
-            });
-        });
+        req.handler(response -> response.bodyHandler(body -> {
+            ReturnData ret = new ReturnData(body.getBytes());
+            synchronized(returnData) {
+                returnData.value = ret;
+                returnData.notify();
+            }
+        }));
 
         if(data != null) {
             req.end(Buffer.buffer(data));
@@ -93,12 +92,7 @@ public class HttpClient extends Fixture {
 
         synchronized(returnData) {
             while(returnData.value == null) {
-                try {
-                    returnData.wait();
-                }
-                catch(InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                Fn.checkRun(returnData::wait);
             }
         }
         return returnData.value;

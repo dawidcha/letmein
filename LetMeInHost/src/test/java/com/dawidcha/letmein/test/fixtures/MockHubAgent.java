@@ -1,6 +1,7 @@
 package com.dawidcha.letmein.test.fixtures;
 
 import com.dawidcha.letmein.data.controlmessage.BaseMessage;
+import com.dawidcha.letmein.util.Fn;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
@@ -8,35 +9,42 @@ import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.WebSocket;
 import io.vertx.core.json.Json;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Deque;
-import java.util.LinkedList;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 
 public class MockHubAgent extends Fixture {
     private final Vertx vertx;
-    private final Deque<byte[]> receivedMessages;
+    private final BlockingDeque<byte[]> receivedMessages;
     private int serverPort =  -1;
     private HttpClient wsClient;
-    private String hubId;
+    private String hubUri;
     private WebSocket ws;
 
     public MockHubAgent(boolean showOutput) {
         super(showOutput);
 
         vertx = Vertx.vertx();
-        receivedMessages = new LinkedList<>();
+        receivedMessages = new LinkedBlockingDeque<>();
     }
 
-    public void setServerPort(int serverPort) {
+    public MockHubAgent setServerPort(int serverPort) {
         this.serverPort = serverPort;
+        return this;
     }
 
-    public void setHubId(String hubId) {
-        this.hubId = hubId;
+    public MockHubAgent setHubId(String hubId) {
+        this.hubUri = "/hub/" + hubId;
+        return this;
+    }
+
+    public MockHubAgent setHubUri(String hubUri) {
+        this.hubUri = hubUri;
+        return this;
     }
 
     public byte[] popNextMessage() {
-        return receivedMessages.pollFirst();
+        return Fn.check(() -> receivedMessages.pollFirst(1, TimeUnit.SECONDS));
     }
 
     public void start() {
@@ -44,7 +52,7 @@ public class MockHubAgent extends Fixture {
                 .setDefaultHost("localhost")
                 .setDefaultPort(serverPort);
 
-        wsClient = vertx.createHttpClient(clientOpts).websocket("/hub/" + hubId, websocket -> {
+        wsClient = vertx.createHttpClient(clientOpts).websocket(hubUri, websocket -> {
             websocket
                     .frameHandler(frame -> {
                         byte[] messageBytes = frame.binaryData().getBytes();
@@ -58,9 +66,13 @@ public class MockHubAgent extends Fixture {
 
                         receivedMessages.add(copyOfMessage);
                     })
-                    .exceptionHandler(e -> {
-                        receivedMessages.add(e.getMessage().getBytes());
-                    });
+                    .closeHandler(Void -> {
+                        receivedMessages.add("Websocket closed by server".getBytes());
+                        synchronized(this) {
+                            ws = null;
+                        }
+                    })
+                    .exceptionHandler(e -> receivedMessages.add(e.getMessage().getBytes()));
 
             synchronized(this) {
                 ws = websocket;
@@ -70,8 +82,11 @@ public class MockHubAgent extends Fixture {
 
         try {
             synchronized (this) {
-                while (ws == null) {
-                    wait();
+                // Failed connections do not report failure back to the client.  So we have to detect failure
+                // to connect by virtue of a timeout (sigh).
+                long stopAt = System.currentTimeMillis() + 1200;
+                while (ws == null && System.currentTimeMillis() < stopAt) {
+                    wait(100);
                 }
             }
         }
@@ -82,8 +97,10 @@ public class MockHubAgent extends Fixture {
 
     public void stop() {
         synchronized(this) {
-            ws.close();
-            ws = null;
+            if(ws != null) {
+                ws.close();
+                ws = null;
+            }
         }
         wsClient.close();
         wsClient = null;
