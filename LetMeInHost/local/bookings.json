@@ -1,6 +1,7 @@
 [
   {
     "bookingReference": "AAAAA",
+    "hubId": "be05cf36-289c-49d5-b05a-b3075f9f93da",
     "email": "test@gmail.com",
     "name": "Test Person",
     "password": "password",
@@ -9,6 +10,7 @@
   },
   {
     "bookingReference": "BBBBB",
+    "hubId": "be05cf36-289c-49d5-b05a-b3075f9f93da",
     "email": "test2@gmail.com",
     "name": "Test Person 2",
     "password": "password",

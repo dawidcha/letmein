@@ -2,6 +2,7 @@ package com.dawidcha.letmein.handlers;
 
 import com.dawidcha.letmein.Registry;
 import com.dawidcha.letmein.data.BookingInfo;
+import com.dawidcha.letmein.data.LoginResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.Vertx;
@@ -59,9 +60,8 @@ public class Login {
                                     booking.password.equals(pwd)) {
 
                                  UUID sessionId = Registry.createSession(booking);
-                                 Map<String, Object> response = new HashMap<>();
-                                 response.put("SessionId", sessionId.toString());
-                                 response.put("Booking", booking);
+
+                                 LoginResponse response = new LoginResponse(sessionId.toString(), booking);
                                  byte[] responseBytes = Json.mapper.writeValueAsBytes(response);
                                  rc.response().headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(responseBytes.length));
                                  rc.response().write(Buffer.buffer(responseBytes));

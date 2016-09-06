@@ -1,5 +1,6 @@
 package com.dawidcha.letmein.handlers;
 
+import com.dawidcha.letmein.Registry;
 import com.dawidcha.letmein.data.HubInfo;
 import com.dawidcha.letmein.data.controlmessage.ActionMessage;
 import com.dawidcha.letmein.data.controlmessage.BaseMessage;
@@ -59,10 +60,7 @@ public class Hub implements Handler<ServerWebSocket> {
             }
         });
 
-        websocket.closeHandler(Void -> {
-
-        });
-
+        websocket.closeHandler(Void -> Registry.closeHubConnection(websocket));
         websocket.exceptionHandler(e -> log.warn("Websocket threw exception", e));
     }
 
@@ -84,6 +82,12 @@ public class Hub implements Handler<ServerWebSocket> {
                         hubs = Json.mapper.readValue(result.result().getBytes(), new TypeReference<List<HubInfo>>() {});
                         for(HubInfo hub: hubs) {
                             if (hub.id.equals(hubId)) {
+
+                                // Acknowledge the connection by sending back the hub id
+                                serverWebSocket.writeFinalTextFrame(Json.mapper.writeValueAsString(hubId));
+
+                                Registry.registerHubConnection(hub, serverWebSocket);
+
                                 setHandlers(serverWebSocket);
                                 return;
                             }

@@ -10,8 +10,9 @@ public class Control {
 
         ret.route().handler(new ExtractSessionId());
 
-        ret.get("/status").handler(rc -> {
+        ret.put("/:device/:property").handler(context -> {
 
+            context.response().end("OK for " + context.request().getParam("device") + "/" + context.request().getParam("property"));
         });
 
         return ret;

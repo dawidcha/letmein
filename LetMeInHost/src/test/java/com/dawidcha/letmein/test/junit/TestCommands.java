@@ -1,20 +1,31 @@
 package com.dawidcha.letmein.test.junit;
 
+import com.dawidcha.letmein.data.BookingInfo;
+import com.dawidcha.letmein.data.LoginResponse;
 import com.dawidcha.letmein.test.fixtures.HttpClient;
 import com.dawidcha.letmein.test.fixtures.MockHostServer;
 import com.dawidcha.letmein.test.fixtures.MockHubAgent;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.vertx.core.MultiMap;
+import io.vertx.core.http.CaseInsensitiveHeaders;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.json.Json;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Base64;
 import java.util.regex.Pattern;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class TestCommands {
-    private static boolean showOutput = true;
+    private static final boolean showOutput = true;
+    private static final String hubId = "be05cf36-289c-49d5-b05a-b3075f9f93da";
+    private static final Base64.Encoder encoder = Base64.getEncoder();
 
     private MockHostServer hostServer;
     private HttpClient client;
@@ -60,16 +71,31 @@ public class TestCommands {
     }
 
     @Test
-    public void testHubAgentActions() {
+    public void testHubAgentActions() throws Exception {
         MockHubAgent hubAgent = new MockHubAgent(showOutput);
         hubAgent.setServerPort(hostServer.getServerPort());
-        hubAgent.setHubId("be05cf36-289c-49d5-b05a-b3075f9f93da");
+        hubAgent.setHubId(hubId);
 
         hubAgent.start();
         try {
-            assertNull("connect was successful", hubAgent.popNextMessage());
+            assertEquals("connect was successful", hubId, Json.mapper.readValue(hubAgent.popNextMessage(), Object.class));
 
-            HttpClient.ReturnData ret = client.request(HttpMethod.PUT, "/control/DoorLock1/LockState", "Locked");
+            HttpClient.ReturnData ret;
+            MultiMap headers;
+
+            // Log in with hardcoded username/password, retrieve the session id and set it onto the client
+            byte[] userPwd = "AAAAA:password".getBytes();
+            headers = new CaseInsensitiveHeaders()
+                    .add(HttpHeaders.AUTHORIZATION, "Basic " + encoder.encodeToString(userPwd));
+            ret = client.request(HttpMethod.GET, "/login/authenticate", headers);
+            assertEquals("Returns OK", ret.statusCode, HttpResponseStatus.OK.code());
+
+            LoginResponse loginResponse = Json.mapper.readValue(ret.data, LoginResponse.class);
+            client.setSessionId(loginResponse.sessionId);
+
+            ret = client.request(HttpMethod.PUT, "/control/DoorLock1/LockState", null, "Locked");
+
+            System.out.println(ret);
         }
         finally {
             hubAgent.stop();

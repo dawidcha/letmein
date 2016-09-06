@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 public class BookingInfo {
     public final String bookingReference;
+    public final String hubId;
     public final String email;
     public final String name;
     public final String password;
@@ -16,6 +17,7 @@ public class BookingInfo {
 
     public BookingInfo(
             @JsonProperty("bookingReference") String bookingReference,
+            @JsonProperty("hubId") String hubId,
             @JsonProperty("email") String email,
             @JsonProperty("name") String name,
             @JsonProperty("password") String password,
@@ -23,6 +25,7 @@ public class BookingInfo {
             @JsonProperty("to") @JsonDeserialize(using = JsonSerialization.ToLocalDateTime.class) LocalDateTime to
     ) {
         this.bookingReference = bookingReference;
+        this.hubId = hubId;
         this.email = email;
         this.name = name;
         this.password = password;

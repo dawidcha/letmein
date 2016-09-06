@@ -1,17 +1,14 @@
 package com.dawidcha.letmein.test.fixtures;
 
-import com.dawidcha.letmein.data.controlmessage.BaseMessage;
 import com.dawidcha.letmein.util.Fn;
 import com.dawidcha.letmein.util.Holder;
+import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.*;
-import io.vertx.core.json.Json;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
-import java.util.Deque;
-import java.util.LinkedList;
 
 public class HttpClient extends Fixture {
     private final Vertx vertx;
@@ -53,30 +50,43 @@ public class HttpClient extends Fixture {
 
     public static class ReturnData {
         public final byte[] data;
+        public final String dataString;
+        public final int statusCode;
+        public final String statusMessage;
 
-        public ReturnData(byte[] data) {
+        public ReturnData(int statusCode, String statusMessage, byte[] data) {
+            this.statusCode = statusCode;
+            this.statusMessage = statusMessage;
             this.data = data;
+            this.dataString = data == null? null: Fn.check(()-> new String(data, StandardCharsets.UTF_8.name()));
         }
     }
 
-    public ReturnData request(HttpMethod method, String uri, String data) {
+    public ReturnData request(HttpMethod method, String uri, MultiMap headers) {
+        return request(method, uri, headers, (byte[])null);
+    }
+
+    public ReturnData request(HttpMethod method, String uri, MultiMap headers, String data) {
         try {
             byte[] dataBytes = data.getBytes(StandardCharsets.UTF_8.name());
-            return request(method, uri, dataBytes);
+            return request(method, uri, headers, dataBytes);
         }
         catch(UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public ReturnData request(HttpMethod method, String uri, byte[] data) {
+    public ReturnData request(HttpMethod method, String uri, MultiMap headers, byte[] data) {
         String uriWithSessionId = (uri.contains("?")? (uri + "&"): (uri + "?")) + "sessionId=" + sessionId;
         HttpClientRequest req = client.request(method, uriWithSessionId);
         req.headers().add(HttpHeaders.ACCEPT, accept);
+        if(headers != null) {
+            req.headers().addAll(headers);
+        }
 
         final Holder<ReturnData> returnData = new Holder<>();
         req.handler(response -> response.bodyHandler(body -> {
-            ReturnData ret = new ReturnData(body.getBytes());
+            ReturnData ret = new ReturnData(response.statusCode(), response.statusMessage(), body.getBytes());
             synchronized(returnData) {
                 returnData.value = ret;
                 returnData.notify();
